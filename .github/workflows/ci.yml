@@ -158,3 +158,55 @@ jobs:
           path: out/smoke-windows/
           if-no-files-found: ignore
           retention-days: 7
+
+  package-linux:
+    name: linux package + verify + smoke
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+      - run: npm i -g npm@10.9.4 --ignore-scripts
+      # node-pty has no Linux prebuild; npm ci compiles it with the runner's
+      # build tools, as a developer install does.
+      - run: npm ci
+      - run: npm run test:packaging
+      - run: npm run package
+      - run: npm run verify:package
+      - name: Install a virtual display and a Secret Service keyring
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends xvfb gnome-keyring
+      # The runner restricts unprivileged user namespaces through AppArmor, so
+      # Chromium needs its setuid sandbox helper. Give it the same owner and
+      # mode the deb/rpm install does; never run with --no-sandbox.
+      - name: Install the sandbox helper as the packages do
+        run: |
+          sudo chown root:root out/Tether-linux-x64/chrome-sandbox
+          sudo chmod 4755 out/Tether-linux-x64/chrome-sandbox
+      # Tether encrypts launch settings with safeStorage and refuses to create
+      # a session without OS encryption, so run the smoke against a throwaway,
+      # unlocked gnome-keyring on a private D-Bus session. Chromium only picks
+      # a keyring backend by itself on desktops it recognizes.
+      - name: Exercise the packaged Linux app
+        env:
+          TETHER_SMOKE_PASSWORD_STORE: gnome-libsecret
+        run: |
+          dbus-run-session -- bash -c '
+            printf "\n" | gnome-keyring-daemon --foreground --unlock --components=secrets > /dev/null &
+            for _ in $(seq 1 40); do
+              busctl --user --timeout=1 status org.freedesktop.secrets > /dev/null 2>&1 && break
+              sleep 0.25
+            done
+            xvfb-run -a npm run smoke:linux
+          '
+      - name: Upload Linux smoke diagnostics
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: linux-smoke-diagnostics
+          path: out/smoke-linux/
+          if-no-files-found: ignore
+          retention-days: 7
