@@ -1,6 +1,8 @@
 import type { ForgeConfig } from '@electron-forge/shared-types';
 import { MakerSquirrel } from '@electron-forge/maker-squirrel';
 import { MakerZIP } from '@electron-forge/maker-zip';
+import { MakerDeb } from '@electron-forge/maker-deb';
+import { MakerRpm } from '@electron-forge/maker-rpm';
 import { VitePlugin } from '@electron-forge/plugin-vite';
 import { FusesPlugin } from '@electron-forge/plugin-fuses';
 import { FuseV1Options, FuseVersion } from '@electron/fuses';
@@ -9,9 +11,25 @@ import path from 'node:path';
 import fs from 'node:fs';
 import { spawnSync } from 'node:child_process';
 
+// Experimental Linux build. Everything Linux-specific below is gated on the
+// build host so the Windows package config stays exactly as it was.
+const isLinuxBuild = process.platform === 'linux';
+
+// Shared by the deb and rpm makers (they generate the .desktop entry).
+const linuxPackageOptions = {
+  productName: 'Tether',
+  genericName: 'Agent CLI Session Manager',
+  icon: './assets/icon.png',
+  categories: ['Development' as const],
+  homepage: 'https://github.com/maxthomas95/tether',
+};
+
 const config: ForgeConfig = {
   packagerConfig: {
     icon: './assets/icon',
+    // The deb/rpm .desktop entry runs `tether` and the makers look for a
+    // binary named after package.json `name`; Linux binaries are lowercase.
+    ...(isLinuxBuild ? { executableName: 'tether' } : {}),
     asar: {
       unpack: '**/node_modules/{node-pty,ssh2}/**',
     },
@@ -25,7 +43,14 @@ const config: ForgeConfig = {
     // CLIs themselves (via `command` in Claude's settings.json and `notify`
     // in Codex's config.toml), so it has to be a real path on disk — not
     // a bundled asar entry.
-    extraResource: ['mcp-servers/tether-helm', 'cli-tools/tether-cli-hook'],
+    //
+    // Linux executables carry no embedded icon, and the Vite plugin only
+    // packages `.vite/`, so the window/notification PNG ships as a resource.
+    extraResource: [
+      'mcp-servers/tether-helm',
+      'cli-tools/tether-cli-hook',
+      ...(isLinuxBuild ? ['assets/icon.png'] : []),
+    ],
   },
   rebuildConfig: {
     // Skip native module rebuild during dev — prebuilt N-API binaries work.
@@ -122,7 +147,10 @@ const config: ForgeConfig = {
   },
   makers: [
     new MakerSquirrel({ setupIcon: './assets/icon.ico' }),
-    new MakerZIP({}, ['darwin', 'win32']),
+    new MakerZIP({}, ['darwin', 'win32', 'linux']),
+    // deb/rpm makers only run on Linux hosts.
+    new MakerDeb({ options: { ...linuxPackageOptions, section: 'devel' } }),
+    new MakerRpm({ options: { ...linuxPackageOptions, license: 'MIT' } }),
   ],
   plugins: [
     new AutoUnpackNativesPlugin({}),
