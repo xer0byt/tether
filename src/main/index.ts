@@ -2,6 +2,7 @@ import { app, BrowserWindow, shell } from 'electron';
 import path from 'node:path';
 import { createTrustedIpc } from './ipc/trusted-ipc';
 import { isAllowedAppNavigation, hardenOfficeGuest } from './window-security';
+import { appIconPath } from './app-icon';
 import squirrelStartup from 'electron-squirrel-startup';
 import { installProcessGuards } from './process-guards';
 import { registerIpcHandlers } from './ipc/handlers';
@@ -121,7 +122,7 @@ function createDocsWindow(target?: DocsOpenTarget): void {
     minWidth: 500,
     minHeight: 400,
     title: 'Tether Documentation',
-    icon: path.join(__dirname, '../../assets/icon.ico'),
+    icon: appIconPath(),
     backgroundColor: loaderTheme.bg,
     show: false,
     titleBarStyle: 'hidden',
@@ -178,7 +179,7 @@ const createWindow = () => {
     minWidth: 600,
     minHeight: 400,
     title: 'Tether',
-    icon: path.join(__dirname, '../../assets/icon.ico'),
+    icon: appIconPath(),
     backgroundColor: loaderTheme.bg,
     show: false,
     titleBarStyle: 'hidden',

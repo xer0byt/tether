@@ -1,5 +1,5 @@
 import { Notification, type BrowserWindow } from 'electron';
-import path from 'node:path';
+import { appIconPath } from '../app-icon';
 import { createLogger } from '../logger';
 import type { NotificationPrefs, SessionState, WaitingReason } from '../../shared/types';
 import { DEFAULT_NOTIFICATION_PREFS } from '../../shared/types';
@@ -288,7 +288,7 @@ export function createNotificationService(opts: {
 }): NotificationService {
   // Bundle the app icon if it's discoverable at the usual path. Best-effort
   // — Notification accepts missing icons silently.
-  const iconCandidate = path.join(__dirname, '../../assets/icon.ico');
+  const iconCandidate = appIconPath();
   return new NotificationService({
     getPrefs: opts.getPrefs,
     onSessionSelect: opts.onSessionSelect,

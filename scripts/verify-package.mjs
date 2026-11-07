@@ -113,6 +113,39 @@ if (path.basename(appDir).includes('-win32-')) {
     const resource = `${ptyUnpacked}/prebuilds/win32-${arch}/conpty/${file}`;
     if (!unpackedFiles.includes(resource)) addFailure(`Bundled ConPTY resource is missing: ${resource}`);
   }
+} else if (path.basename(appDir).includes('-linux-')) {
+  verifyLinuxPackage(path.basename(appDir).split('-').at(-1));
+}
+
+// node-pty ships no Linux prebuild, so the binding is compiled at install
+// time. The generic .node check above is already satisfied by the bundled
+// win32/darwin prebuilds, so look for the one node-pty actually loads on
+// Linux (build/Release first, then prebuilds/linux-<arch>) and make sure it
+// is an ELF object for the packaged architecture. Linux needs no
+// spawn-helper (node-pty only uses it on macOS).
+function verifyLinuxPackage(arch) {
+  const elfMachines = { x64: 62, arm64: 183 };
+  const candidates = [
+    `${ptyUnpacked}/build/Release/pty.node`,
+    `${ptyUnpacked}/prebuilds/linux-${arch}/pty.node`,
+  ];
+  const binding = candidates.find(file => unpackedFiles.includes(file));
+  if (!binding) {
+    addFailure(`node-pty has no Linux native binding; expected one of: ${candidates.join(', ')}`);
+  } else {
+    const header = Buffer.alloc(20);
+    const fd = fs.openSync(path.join(unpackedDir, ...binding.split('/')), 'r');
+    try { fs.readSync(fd, header, 0, header.length, 0); } finally { fs.closeSync(fd); }
+    const isElf = header.subarray(0, 4).equals(Buffer.from([0x7f, 0x45, 0x4c, 0x46]));
+    if (!isElf) addFailure(`${binding} is not an ELF shared object.`);
+    else if (elfMachines[arch] !== undefined && header.readUInt16LE(18) !== elfMachines[arch]) {
+      addFailure(`${binding} was built for ELF machine ${header.readUInt16LE(18)}, not ${arch}.`);
+    }
+  }
+  // The deb/rpm .desktop entries run `tether`; the window icon ships as a
+  // resource because Linux executables embed none (see forge.config.ts).
+  if (!fs.existsSync(path.join(appDir, 'tether'))) addFailure('Linux executable is missing: tether');
+  if (!fs.existsSync(path.join(resourcesDir, 'icon.png'))) addFailure('Linux window icon is missing: resources/icon.png');
 }
 
 // Forge copies extraResources to their basename under resources/ (e.g.
