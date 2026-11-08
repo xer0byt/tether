@@ -2,8 +2,13 @@
 
 CI runs `npm run test:coverage` in the existing `tests` job, then uploads the
 `coverage` artifact (LCOV plus browsable HTML, retained for seven days). The
-separate `SonarQube scan` job imports that report into the existing
-`maxthomas95_tether` project. It does not run the tests again.
+separate `SonarQube scan` job imports that report into the `xer0byt_tether`
+project in the `xer0byt` organization. It does not run the tests again.
+
+This repository is a fork of `maxthomas95/tether`, whose scan reports to
+`maxthomas95_tether`. The fork reports to its own SonarQube Cloud project, so
+keep `sonar.organization` and `sonar.projectKey` in `sonar-project.properties`
+out of any change sent upstream.
 
 Run `npm run test:coverage` locally and open `coverage/index.html` to inspect
 coverage. The suite includes untested application TS/TSX files in its baseline;
@@ -52,7 +57,7 @@ recreated project:
 
 1. Create a SonarQube Cloud token with Execute Analysis permission for Tether.
    Add it directly as the repository Actions secret `SONAR_TOKEN` at
-   <https://github.com/maxthomas95/tether/settings/secrets/actions>.
+   <https://github.com/xer0byt/tether/settings/secrets/actions>.
    Do not put the token in source files, chat, command arguments, or logs.
 2. Assign the built-in `Sonar way` quality gate and use **Previous version**
    for new code, following the policy above. Keep Sonar optional in branch
